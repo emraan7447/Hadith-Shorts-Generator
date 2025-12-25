@@ -14,6 +14,6 @@
   },
   "scripts": {
     "start": "echo 'Open index.html in your browser' && exit 0",
-    "build": "node -e \"const fs=require('fs'); const f='services/geminiService.ts'; const content=fs.readFileSync(f, 'utf8'); fs.writeFileSync(f, content.replace(/process\\.env\\.API_KEY/g, '\\\"' + (process.env.API_KEY || '') + '\\\"'));\""
+    "build": "echo 'No build step required for static hosting'"
   }
 }

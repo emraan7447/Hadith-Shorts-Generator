@@ -6,17 +6,13 @@ const HADITH_API_KEY = "$2y$10$jbHREOhejIkUNGEnqnX4eq49Y55wzlBVf2UVDAPoQKgK0Jpb2
 const PEXELS_API_KEY = "b88Ldc0xcVaGbF3g5znBOiurvWee3OG5SvIcZuOoyQP2ZrYcG9IIGItp";
 
 /**
- * Robust API key retrieval.
- * Priorities: 1. LocalStorage (User Input), 2. Process Env (Build Injection)
+ * Robust API key retrieval for static deployments like GitHub Pages.
+ * Priority: LocalStorage (User Input)
  */
 export const getStoredApiKey = () => {
   if (typeof window !== 'undefined') {
-    const localKey = localStorage.getItem('GEMINI_API_KEY');
-    if (localKey) return localKey;
+    return localStorage.getItem('GEMINI_API_KEY');
   }
-  // Fallback to injected env var
-  const envKey = process.env.API_KEY;
-  if (envKey && envKey !== "undefined" && envKey !== "") return envKey;
   return null;
 };
 
