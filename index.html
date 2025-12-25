@@ -7,6 +7,10 @@
     <title>HadithShorts AI - YouTube Shorts Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      // Shim process.env for browser compatibility in static deployments
+      window.process = { env: { API_KEY: undefined } };
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .font-arabic { font-family: 'Amiri', serif; }

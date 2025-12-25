@@ -38,6 +38,15 @@ export class HadithService {
       };
     } catch (error) {
       console.warn("External Hadith API failed, using fallback:", error);
+      
+      // Handle potential key selection requirement
+      if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          await (window as any).aistudio.openSelectKey();
+        }
+      }
+
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
       const aiResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -86,6 +95,14 @@ export class HadithService {
    * Generates audio using Gemini TTS.
    */
   static async generateVoiceover(text: string, voiceName: string = "Kore"): Promise<string> {
+    // Handle potential key selection requirement
+    if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        await (window as any).aistudio.openSelectKey();
+      }
+    }
+
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -101,7 +118,7 @@ export class HadithService {
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("TTS failed");
+    if (!base64Audio) throw new Error("TTS failed. Please verify your API Key has access to the Gemini 2.5 Flash TTS model.");
     return base64Audio;
   }
 }
