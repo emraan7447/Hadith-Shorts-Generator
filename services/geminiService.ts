@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { Hadith } from "../types";
+import { Hadith } from "../types.ts";
 
 const HADITH_API_KEY = "$2y$10$jbHREOhejIkUNGEnqnX4eq49Y55wzlBVf2UVDAPoQKgK0Jpb2XDy";
 const PEXELS_API_KEY = "b88Ldc0xcVaGbF3g5znBOiurvWee3OG5SvIcZuOoyQP2ZrYcG9IIGItp";

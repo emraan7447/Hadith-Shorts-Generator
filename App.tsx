@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Hadith, VideoSettings, GenerationState } from './types';
-import { TEMPLATES, VOICES } from './constants';
-import { HadithService, getStoredApiKey } from './services/geminiService';
-import VideoPreview, { VideoPreviewHandle } from './components/VideoPreview';
+import { Hadith, VideoSettings, GenerationState } from './types.ts';
+import { TEMPLATES, VOICES } from './constants.tsx';
+import { HadithService, getStoredApiKey } from './services/geminiService.ts';
+import VideoPreview, { VideoPreviewHandle } from './components/VideoPreview.tsx';
 
 async function decodeRawPcm(
   data: Uint8Array,
@@ -329,7 +329,7 @@ const App: React.FC = () => {
                     className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-slate-200 disabled:opacity-50 hover:bg-black transition-all transform active:scale-[0.98] flex items-center justify-center gap-3"
                   >
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Produce Video Short

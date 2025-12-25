@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { Hadith, VideoTemplate, VideoSettings } from '../types';
+import { Hadith, VideoTemplate, VideoSettings } from '../types.ts';
 
 interface VideoPreviewProps {
   hadith: Hadith | null;
