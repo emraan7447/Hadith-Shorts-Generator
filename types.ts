@@ -6,6 +6,14 @@ export interface Hadith {
   grade: string;
 }
 
+export interface HadithCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  query: string;
+}
+
 export interface VideoTemplate {
   id: string;
   name: string;
@@ -27,4 +35,5 @@ export interface VideoSettings {
   fontSize: number;
   voice: 'Kore' | 'Puck' | 'Charon' | 'Fenrir' | 'Zephyr';
   includeArabic: boolean;
+  category: string;
 }

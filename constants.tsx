@@ -1,5 +1,64 @@
 
-import { VideoTemplate } from './types';
+import { VideoTemplate, HadithCategory } from './types';
+
+export const HADITH_CATEGORIES: HadithCategory[] = [
+  {
+    id: 'random',
+    name: 'Surprise Me',
+    description: 'Any authentic narration',
+    icon: '✨',
+    query: ''
+  },
+  {
+    id: 'rewards',
+    name: 'Earn Rewards',
+    description: 'High reward simple deeds',
+    icon: '💎',
+    query: 'virtues'
+  },
+  {
+    id: 'daily-life',
+    name: 'Daily Life',
+    description: 'Manners and character',
+    icon: '🏠',
+    query: 'manners'
+  },
+  {
+    id: 'morning',
+    name: 'Morning',
+    description: 'Start your day right',
+    icon: '☀️',
+    query: 'morning'
+  },
+  {
+    id: 'evening',
+    name: 'Evening',
+    description: 'Sunset reflections',
+    icon: '🌆',
+    query: 'evening'
+  },
+  {
+    id: 'night',
+    name: 'Night & Sleep',
+    description: 'Sleep and night prayer',
+    icon: '🌌',
+    query: 'night'
+  },
+  {
+    id: 'patience',
+    name: 'Patience',
+    description: 'Hope and trials',
+    icon: '⚓',
+    query: 'patience'
+  },
+  {
+    id: 'parents',
+    name: 'Parents',
+    description: 'Rights of family',
+    icon: '💖',
+    query: 'parents'
+  }
+];
 
 export const TEMPLATES: VideoTemplate[] = [
   {

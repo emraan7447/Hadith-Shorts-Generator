@@ -1,30 +1,21 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { Hadith } from "../types.ts";
+import { Hadith } from "../types";
 
 const HADITH_API_KEY = "$2y$10$jbHREOhejIkUNGEnqnX4eq49Y55wzlBVf2UVDAPoQKgK0Jpb2XDy";
 const PEXELS_API_KEY = "b88Ldc0xcVaGbF3g5znBOiurvWee3OG5SvIcZuOoyQP2ZrYcG9IIGItp";
 
-/**
- * Robust API key retrieval for static deployments like GitHub Pages.
- * Priority: LocalStorage (User Input)
- */
-export const getStoredApiKey = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('GEMINI_API_KEY');
-  }
-  return null;
-};
-
 export class HadithService {
   /**
-   * Fetches a real Hadith from hadithapi.com.
+   * Fetches a real Hadith from hadithapi.com with theme support.
    */
-  static async getRandomAuthenticHadith(): Promise<Hadith> {
+  static async getRandomAuthenticHadith(keyword: string = ""): Promise<Hadith> {
     try {
-      const randomPage = Math.floor(Math.random() * 50) + 1;
+      const queryParam = keyword ? `&hadithEnglish=${encodeURIComponent(keyword)}` : '';
+      const randomPage = Math.floor(Math.random() * 20) + 1;
+      
       const response = await fetch(
-        `https://hadithapi.com/api/hadiths?apiKey=${HADITH_API_KEY}&paginate=10&page=${randomPage}`
+        `https://hadithapi.com/api/hadiths?apiKey=${HADITH_API_KEY}&paginate=15&page=${randomPage}${queryParam}`
       );
       
       if (!response.ok) throw new Error("Hadith API Request Failed");
@@ -32,30 +23,32 @@ export class HadithService {
       const data = await response.json();
       const hadiths = data.hadiths?.data || [];
       
+      if (hadiths.length === 0 && keyword !== "") {
+        // Retry without keyword if specific search fails
+        return this.getRandomAuthenticHadith("");
+      }
+      
       if (hadiths.length === 0) throw new Error("No Hadiths found");
       
       const raw = hadiths[Math.floor(Math.random() * hadiths.length)];
 
-      const bookName = raw.bookName || (raw.book && raw.book.bookName) || "Sahih Hadith";
-      const hadithNum = raw.hadithNumber || raw.id || "N/A";
-      const volume = raw.volume ? `Vol. ${raw.volume}` : "";
-      
       return {
         arabic: raw.hadithArabic || "",
         english: raw.hadithEnglish || "Translation not available.",
-        source: `${bookName} ${volume} - Hadith No. ${hadithNum}`,
+        source: `${raw.bookName || "Sahih Hadith"} - Hadith No. ${raw.hadithNumber || raw.id}`,
         grade: raw.status || "Sahih"
       };
     } catch (error) {
       console.warn("External Hadith API failed, using Gemini fallback:", error);
       
-      const key = getStoredApiKey();
-      if (!key) throw new Error("API Key required for fallback AI generation.");
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = keyword 
+        ? `Provide one authentic Sahih Hadith from Sahih Bukhari or Sahih Muslim specifically related to ${keyword}. Output ONLY a JSON object with keys: arabic, english, source, and grade.`
+        : "Provide one authentic Sahih Hadith from Sahih Bukhari or Sahih Muslim. Output ONLY a JSON object with keys: arabic, english, source, and grade.";
 
-      const ai = new GoogleGenAI({ apiKey: key });
       const aiResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: "Provide one authentic Sahih Hadith from Sahih Bukhari or Sahih Muslim. Output ONLY a JSON object with keys: arabic, english, source (Include Book Name, Volume if possible, and Hadith Number), and grade.",
+        contents: prompt,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -80,7 +73,7 @@ export class HadithService {
   static async getPexelsVideo(query: string = "islamic scenery"): Promise<string> {
     try {
       const response = await fetch(
-        `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=10`,
+        `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=15`,
         { headers: { Authorization: PEXELS_API_KEY } }
       );
       if (!response.ok) throw new Error("Pexels fetch failed");
@@ -100,10 +93,7 @@ export class HadithService {
    * Generates audio using Gemini TTS.
    */
   static async generateVoiceover(text: string, voiceName: string = "Kore"): Promise<string> {
-    const key = getStoredApiKey();
-    if (!key) throw new Error("API Key required for voice generation.");
-
-    const ai = new GoogleGenAI({ apiKey: key });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Please narrate this Hadith clearly: ${text}` }] }],
@@ -118,7 +108,7 @@ export class HadithService {
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("TTS generation failed. Please check your API key permissions.");
+    if (!base64Audio) throw new Error("TTS generation failed.");
     return base64Audio;
   }
 }
