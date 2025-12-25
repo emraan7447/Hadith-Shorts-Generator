@@ -2,14 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Hadith, VideoSettings, GenerationState } from './types';
 import { TEMPLATES, VOICES } from './constants';
-import { HadithService } from './services/geminiService';
+import { HadithService, getStoredApiKey } from './services/geminiService';
 import VideoPreview, { VideoPreviewHandle } from './components/VideoPreview';
 
-/**
- * Manual decoder for raw PCM audio data returned by Gemini TTS.
- * The browser's native decodeAudioData expects a file header (WAV/MP3),
- * which the raw PCM data from the API does not have.
- */
 async function decodeRawPcm(
   data: Uint8Array,
   ctx: AudioContext,
@@ -23,7 +18,6 @@ async function decodeRawPcm(
   for (let channel = 0; channel < numChannels; channel++) {
     const channelData = buffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {
-      // Convert 16-bit PCM to float range [-1, 1]
       channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
     }
   }
@@ -34,6 +28,10 @@ const App: React.FC = () => {
   const [hadith, setHadith] = useState<Hadith | null>(null);
   const [backgroundVideo, setBackgroundVideo] = useState<string | null>(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(!!getStoredApiKey());
+
   const [settings, setSettings] = useState<VideoSettings>({
     templateId: TEMPLATES[0].id,
     fontSize: 24,
@@ -50,6 +48,20 @@ const App: React.FC = () => {
   const previewRef = useRef<VideoPreviewHandle>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
+  useEffect(() => {
+    if (!hasApiKey) {
+      setShowKeyModal(true);
+    }
+  }, [hasApiKey]);
+
+  const saveApiKey = () => {
+    if (tempApiKey.trim()) {
+      localStorage.setItem('GEMINI_API_KEY', tempApiKey.trim());
+      setHasApiKey(true);
+      setShowKeyModal(false);
+    }
+  };
+
   const fetchHadith = async () => {
     setGenState({ status: 'fetching_hadith', progress: 10, message: 'Fetching authentic Hadith...' });
     setFinalVideoUrl(null);
@@ -65,18 +77,21 @@ const App: React.FC = () => {
       setGenState({ status: 'idle', progress: 0, message: '' });
     } catch (error: any) {
       console.error("Hadith fetch error:", error);
-      setGenState({ status: 'error', progress: 0, message: 'Check your internet or API keys.' });
+      setGenState({ status: 'error', progress: 0, message: 'Check your internet or API key settings.' });
     }
   };
 
   const generateFullVideo = async () => {
+    if (!getStoredApiKey()) {
+      setShowKeyModal(true);
+      return;
+    }
     if (!hadith || !previewRef.current) return;
     
     setGenState({ status: 'generating_tts', progress: 10, message: 'Preparing voiceover...' });
     setFinalVideoUrl(null);
     
     try {
-      // 1. Generate Voiceover Audio (Raw PCM Base64)
       const base64Audio = await HadithService.generateVoiceover(hadith.english, settings.voice);
       const binaryString = window.atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
@@ -84,10 +99,9 @@ const App: React.FC = () => {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Initialize AudioContext if not already done
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-          sampleRate: 24000 // Match TTS default
+          sampleRate: 24000
         });
       }
       
@@ -95,7 +109,6 @@ const App: React.FC = () => {
         await audioContextRef.current.resume();
       }
 
-      // 2. Manual Decode of Raw PCM (24kHz Mono)
       const audioBuffer = await decodeRawPcm(bytes, audioContextRef.current, 24000, 1);
 
       setGenState({ status: 'generating_video', progress: 40, message: 'Rendering video & audio...' });
@@ -103,8 +116,6 @@ const App: React.FC = () => {
       const bgVideo = previewRef.current.getVideoElement();
       if (!canvas) throw new Error("Canvas monitor not ready");
 
-      // 3. Setup Recording Stream
-      // Ensure the canvas is "active" by capturing the stream
       const canvasStream = canvas.captureStream(30);
       const audioDest = audioContextRef.current.createMediaStreamDestination();
       const audioSource = audioContextRef.current.createBufferSource();
@@ -116,7 +127,6 @@ const App: React.FC = () => {
         ...audioDest.stream.getAudioTracks()
       ]);
 
-      // Detect supported container
       const mimeType = [
         'video/webm;codecs=vp9,opus',
         'video/webm;codecs=vp8,opus',
@@ -128,7 +138,7 @@ const App: React.FC = () => {
 
       const recorder = new MediaRecorder(combinedStream, { 
         mimeType,
-        videoBitsPerSecond: 5000000 // 5Mbps for high quality
+        videoBitsPerSecond: 5000000 
       });
       
       const chunks: Blob[] = [];
@@ -142,11 +152,9 @@ const App: React.FC = () => {
         setGenState({ status: 'complete', progress: 100, message: 'Short Production Complete!' });
       };
 
-      // 4. Start the Process
       recorder.start();
       audioSource.start();
 
-      // Ensure background video plays if it exists
       if (bgVideo && bgVideo.paused) {
         bgVideo.play().catch(console.error);
       }
@@ -177,22 +185,55 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-emerald-100">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans selection:bg-emerald-100 relative">
+      {/* API Key Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-slate-200">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Gemini API Key Required</h2>
+            <p className="text-sm text-slate-500 mb-6">Voiceover and AI analysis require a Gemini API Key. Get one for free at <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-emerald-600 font-bold hover:underline">Google AI Studio</a>.</p>
+            <input 
+              type="password"
+              placeholder="Paste your API key here..."
+              className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl mb-4 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+              value={tempApiKey}
+              onChange={(e) => setTempApiKey(e.target.value)}
+            />
+            <button 
+              onClick={saveApiKey}
+              className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-100"
+            >
+              Save & Start Generating
+            </button>
+            <p className="mt-4 text-[10px] text-center text-slate-400 uppercase font-black tracking-widest">Saved locally in your browser</p>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <div className="bg-emerald-600 p-2 rounded-lg text-white font-bold shadow-md shadow-emerald-100">HS</div>
           <h1 className="text-xl font-bold tracking-tight">HadithShorts <span className="text-emerald-600">AI</span></h1>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
-            Standard Version
+          <button 
+            onClick={() => setShowKeyModal(true)}
+            className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+            title="API Settings"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+          <span className="hidden sm:inline-block text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
+            Deployment v1.1
           </span>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {/* Content Selector */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
@@ -234,12 +275,11 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* Customization */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h2 className="font-bold text-lg text-slate-800 mb-6">2. Production Settings</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
-                <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Atmospheric Visuals (Pexels)</label>
+                <label className="text-xs font-black text-slate-400 uppercase tracking-wider">Atmospheric Visuals</label>
                 <div className="grid grid-cols-3 gap-3">
                   {TEMPLATES.slice(0, 6).map(t => (
                     <button 
@@ -259,7 +299,7 @@ const App: React.FC = () => {
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Narrator Voice (TTS)</label>
+                  <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Narrator Voice</label>
                   <select 
                     className="w-full bg-slate-50 p-4 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500/20 font-medium transition-all"
                     value={settings.voice}
@@ -300,7 +340,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Studio Panel */}
         <div className="space-y-6">
           <h2 className="text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Live Production Feed</h2>
           
@@ -313,7 +352,6 @@ const App: React.FC = () => {
             isGenerating={genState.status !== 'idle' && genState.status !== 'complete' && genState.status !== 'error'}
           />
 
-          {/* Progress Monitor */}
           {(genState.status !== 'idle' && genState.status !== 'complete') && (
             <div className={`bg-white p-6 rounded-3xl border-2 shadow-2xl animate-in slide-in-from-bottom-4 duration-300 ${genState.status === 'error' ? 'border-red-100 bg-red-50/50' : 'border-emerald-50'}`}>
               <div className="flex justify-between items-center mb-3">
@@ -337,7 +375,6 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Result Preview & Action */}
           {genState.status === 'complete' && finalVideoUrl && (
             <div className="bg-white p-6 rounded-3xl border-4 border-emerald-500 shadow-[0_20px_50px_rgba(16,185,129,0.2)] animate-in slide-in-from-top-4 duration-500">
               <div className="flex items-center gap-2 mb-4">

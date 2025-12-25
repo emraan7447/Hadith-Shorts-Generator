@@ -6,15 +6,18 @@ const HADITH_API_KEY = "$2y$10$jbHREOhejIkUNGEnqnX4eq49Y55wzlBVf2UVDAPoQKgK0Jpb2
 const PEXELS_API_KEY = "b88Ldc0xcVaGbF3g5znBOiurvWee3OG5SvIcZuOoyQP2ZrYcG9IIGItp";
 
 /**
- * Helper to ensure the API key is available.
- * On Vercel, this is injected during the build process via package.json scripts.
+ * Robust API key retrieval.
+ * Priorities: 1. LocalStorage (User Input), 2. Process Env (Build Injection)
  */
-const getApiKey = () => {
-  const key = process.env.API_KEY;
-  if (!key || key === "undefined" || key === "") {
-    throw new Error("Gemini API Key is missing. Please add 'API_KEY' to your Vercel Environment Variables and re-deploy.");
+export const getStoredApiKey = () => {
+  if (typeof window !== 'undefined') {
+    const localKey = localStorage.getItem('GEMINI_API_KEY');
+    if (localKey) return localKey;
   }
-  return key;
+  // Fallback to injected env var
+  const envKey = process.env.API_KEY;
+  if (envKey && envKey !== "undefined" && envKey !== "") return envKey;
+  return null;
 };
 
 export class HadithService {
@@ -50,7 +53,10 @@ export class HadithService {
     } catch (error) {
       console.warn("External Hadith API failed, using Gemini fallback:", error);
       
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
+      const key = getStoredApiKey();
+      if (!key) throw new Error("API Key required for fallback AI generation.");
+
+      const ai = new GoogleGenAI({ apiKey: key });
       const aiResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: "Provide one authentic Sahih Hadith from Sahih Bukhari or Sahih Muslim. Output ONLY a JSON object with keys: arabic, english, source (Include Book Name, Volume if possible, and Hadith Number), and grade.",
@@ -98,7 +104,10 @@ export class HadithService {
    * Generates audio using Gemini TTS.
    */
   static async generateVoiceover(text: string, voiceName: string = "Kore"): Promise<string> {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
+    const key = getStoredApiKey();
+    if (!key) throw new Error("API Key required for voice generation.");
+
+    const ai = new GoogleGenAI({ apiKey: key });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Please narrate this Hadith clearly: ${text}` }] }],
