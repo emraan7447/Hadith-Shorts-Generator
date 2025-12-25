@@ -1,0 +1,7 @@
+{
+  "name": "HadithShorts AI",
+  "description": "Create engaging YouTube Shorts featuring authentic Hadiths with AI-generated visuals and natural voiceovers.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
