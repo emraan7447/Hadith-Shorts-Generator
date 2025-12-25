@@ -5,6 +5,18 @@ import { Hadith } from "../types";
 const HADITH_API_KEY = "$2y$10$jbHREOhejIkUNGEnqnX4eq49Y55wzlBVf2UVDAPoQKgK0Jpb2XDy";
 const PEXELS_API_KEY = "b88Ldc0xcVaGbF3g5znBOiurvWee3OG5SvIcZuOoyQP2ZrYcG9IIGItp";
 
+/**
+ * Helper to ensure the API key is available.
+ * On Vercel, this is injected during the build process via package.json scripts.
+ */
+const getApiKey = () => {
+  const key = process.env.API_KEY;
+  if (!key || key === "undefined" || key === "") {
+    throw new Error("Gemini API Key is missing. Please add 'API_KEY' to your Vercel Environment Variables and re-deploy.");
+  }
+  return key;
+};
+
 export class HadithService {
   /**
    * Fetches a real Hadith from hadithapi.com.
@@ -25,7 +37,6 @@ export class HadithService {
       
       const raw = hadiths[Math.floor(Math.random() * hadiths.length)];
 
-      // Robust extraction to avoid 'undefined'
       const bookName = raw.bookName || (raw.book && raw.book.bookName) || "Sahih Hadith";
       const hadithNum = raw.hadithNumber || raw.id || "N/A";
       const volume = raw.volume ? `Vol. ${raw.volume}` : "";
@@ -37,17 +48,9 @@ export class HadithService {
         grade: raw.status || "Sahih"
       };
     } catch (error) {
-      console.warn("External Hadith API failed, using fallback:", error);
+      console.warn("External Hadith API failed, using Gemini fallback:", error);
       
-      // Handle potential key selection requirement
-      if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
-        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-        if (!hasKey) {
-          await (window as any).aistudio.openSelectKey();
-        }
-      }
-
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       const aiResponse = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: "Provide one authentic Sahih Hadith from Sahih Bukhari or Sahih Muslim. Output ONLY a JSON object with keys: arabic, english, source (Include Book Name, Volume if possible, and Hadith Number), and grade.",
@@ -70,7 +73,7 @@ export class HadithService {
   }
 
   /**
-   * Fetches a relevant video background from Pexels (using your provided key).
+   * Fetches a relevant video background from Pexels.
    */
   static async getPexelsVideo(query: string = "islamic scenery"): Promise<string> {
     try {
@@ -95,15 +98,7 @@ export class HadithService {
    * Generates audio using Gemini TTS.
    */
   static async generateVoiceover(text: string, voiceName: string = "Kore"): Promise<string> {
-    // Handle potential key selection requirement
-    if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await (window as any).aistudio.openSelectKey();
-      }
-    }
-
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Please narrate this Hadith clearly: ${text}` }] }],
@@ -118,7 +113,7 @@ export class HadithService {
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("TTS failed. Please verify your API Key has access to the Gemini 2.5 Flash TTS model.");
+    if (!base64Audio) throw new Error("TTS generation failed. Please check your API key permissions.");
     return base64Audio;
   }
 }
